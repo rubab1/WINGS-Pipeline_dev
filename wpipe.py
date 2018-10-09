@@ -196,7 +196,7 @@ class Target():
         self.pipeline_id = np.array([int(pipeline.pipeline_id)])
         self.target_id = np.array([int(0)])
         myPipe = Pipeline.get(self.pipeline_id)
-        self.relativepath = np.array([str(myPipe.data_root)+'/'+str(self.name)])
+        self.relativepath = np.array([str(myPipe.data_root)+'/'+str(self.name[0])])
         self.timestamp = pd.to_datetime(time.time(),unit='s')
         return None
 
@@ -211,7 +211,7 @@ class Target():
         _opt = Options(options).create('target',int(_df.target_id),store=store)
         
         if create_dir:
-            _t = subprocess.run(['mkdir', '-p', str(self.relativepath)], stdout=subprocess.PIPE)
+            _t = subprocess.run(['mkdir', '-p', str(self.relativepath[0])], stdout=subprocess.PIPE)
         
         if ret_opt:
             return _df, _opt
@@ -227,7 +227,11 @@ class Configuration():
     def __init__(self,name='',description='',
                  target=Target().new()):
         self.name = np.array([str(name)])
-        self.relativepath = np.array([str(target.relativepath)])
+        self.relativepath = np.array([str(target.relativepath[0])])
+        self.logpath = np.array([str(target.relativepath[0])+'/log_'+str(name)])
+        self.confpath = np.array([str(target.relativepath[0])+'/conf_'+str(name)])
+        self.rawpath = np.array([str(target.relativepath[0])+'/raw_'+str(name)])
+        self.procpath = np.array([str(target.relativepath[0])+'/proc_'+str(name)])
         self.target_id = np.array([int(target.target_id)])
         self.pipeline_id = np.array([int(target.pipeline_id)])
         self.config_id = np.array([int(0)])
@@ -248,14 +252,8 @@ class Configuration():
         _params = Parameters(params).create(_df,store=store)
         
         if create_dir:
-            _t1 = ['mkdir', '-p', self.relativepath+'/raw_'+str(self.name)]
-            _t2 = ['mkdir', '-p', self.relativepath+'/conf_'+str(self.name)]
-            _t3 = ['mkdir', '-p', self.relativepath+'/proc_'+str(self.name)]
-            _t4 = ['mkdir', '-p', self.relativepath+'/log_'+str(self.name)]    
-            _t = subprocess.run(_t1, stdout=subprocess.PIPE)
-            _t = subprocess.run(_t2, stdout=subprocess.PIPE)
-            _t = subprocess.run(_t3, stdout=subprocess.PIPE)
-            _t = subprocess.run(_t4, stdout=subprocess.PIPE)
+            for _path in [self.rawpath[0],self.confpath[0],self.procpath[0],self.logpath[0]]:
+                _t = _t = subprocess.run(['mkdir', '-p', str(_path)], stdout=subprocess.PIPE)
         
         if ret_opt:
             return _df, _params
@@ -517,7 +515,10 @@ def fire(event):
     event_id = event['event_id'].values[0]
     #print("HERE ",event['name'].values[0]," DONE")
     parent_job = Job.get(int(event.job_id))
-    conf_id = int(parent_job.config_id)
+    try:
+        conf_id = int(Options.get('event',event_id)['config_id'])
+    except:
+        conf_id = int(parent_job.config_id)
     configuration = Configuration.get(conf_id)
     pipeline_id = parent_job.pipeline_id
     #print(pipeline_id)
@@ -543,12 +544,11 @@ def fire(event):
                 return
 
 def logprint(configuration,job,log_text):
-    target_id = configuration['target_id'].values[0]
-    pipeline_id = configuration['pipeline_id'].values[0]
-    print("T",target_id,"P",pipeline_id)
+    target_id = configuration['target_id']#.values[0]
+    pipeline_id = configuration['pipeline_id']#.values[0]
     myPipe = Pipeline.get(pipeline_id)
     myTarg = Target.get(target_id)
-    conf_name = configuration['name'].values[0]
+    conf_name = configuration['name']#.values[0]
     targ_name = myTarg['name']
     logpath = myPipe.data_root+'/'+targ_name+'/log_'+conf_name+'/'
     job_id = job['job_id']
@@ -557,7 +557,6 @@ def logprint(configuration,job,log_text):
     task = Task.get(task_id)
     task_name = task['name']
     logfile = task_name+'_j'+str(job_id)+'_e'+str(event_id)+'.log'
-    print(task_name,job_id,event_id,logpath)
     try:
      log = open(logpath+logfile, "a")
     except:
