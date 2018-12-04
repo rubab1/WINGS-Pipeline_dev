@@ -28,7 +28,9 @@ def discover_targets(Pipe,config_file,data_dir):
       conffilename = config_file.split('/')[-1]
       confname = conffilename.split('.')[0]
       conf = Configuration(name=confname,target=myTarget).create(params=_params,create_dir=True)
-      print('Target ',targ,' created with Configuration ',confname)
+      confret = Configuration.get(int(conf['config_id'].item()))
+      targid = myTarget['target_id'].item()
+      logprint(confret,myJob,''.join(['Target ',targ,' with ID ',str(targid),' created with Configuration ',confname,' and ID ',str(confret.config_id)]))
       _t = subprocess.run(['cp',config_file,conf.confpath.values[0]+'/'],stdout=subprocess.PIPE)
       _dp = DataProduct(filename=conffilename,relativepath=myPipe.config_root,group='conf',configuration=conf).create()
       targetfiles = get_target_files(data_dir,targ)
@@ -63,8 +65,8 @@ def send(dp,conf,comp_name,total,job):
    dpid = int(dp.dp_id)
    confid = int(conf.config_id)
    print('TEST',dp.filename[0],filepath)
-   data = np.loadtxt(filepath)
-   if 'type' in str(data[0,0]):
+   data = np.loadtxt(filepath, dtype=str, usecols=0)
+   if 'type' in str(data[0]):
       print('File ',filepath,' has type keyword, assuming STIPS-ready')
       event = Job.getEvent(job,'new_stips_catalog',options={'dp_id':dpid,'to_run':total,'name':comp_name})
       fire(event)
